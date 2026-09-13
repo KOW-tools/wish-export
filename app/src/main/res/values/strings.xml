@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Wish Export</string>
+    <string name="welcome_title">Choose Access Mode</string>
+    <string name="shizuku_mode">Shizuku Mode</string>
+    <string name="shizuku_description">Use Shizuku for non-root access to logcat</string>
+    <string name="root_mode">Root Mode</string>
+    <string name="root_description">Direct root access for logcat monitoring</string>
+    <string name="start_capture">Start Capture</string>
+    <string name="stop_capture">Stop Capture</string>
+    <string name="capturing">Capturing...</string>
+    <string name="copy_to_clipboard">Copy to Clipboard</string>
+    <string name="about">About</string>
+    <string name="about_title">Wish Export</string>
+    <string name="about_description">This app captures wish/gacha history URLs from Genshin Impact, Honkai Star Rail, and Zenless Zone Zero by monitoring logcat.\n\nTo use:\n1. Select your access mode (Shizuku or Root)\n2. Open the game and navigate to wish/warp/signal history\n3. Tap the capture button\n4. The URL will be automatically detected and displayed\n5. Copy the URL to import your history</string>
+    <string name="close">Close</string>
+    <string name="no_url_found">No wish URL detected. Please open the wish history in your game and try again.</string>
+    <string name="error_occurred">An error occurred: %s</string>
+    <string name="shizuku_not_running">Shizuku is not running. Please start Shizuku and try again.</string>
+    <string name="root_not_available">Root access is not available on this device.</string>
+    <string name="permission_required">Permission Required</string>
+    <string name="permission_required_message">Failed to start service because root/Shizuku permission is not granted. Please grant the required permission and try again.</string>
+    <string name="ok">OK</string>
+    <string name="ready_to_capture">Ready to Capture</string>
+    <string name="start_capture_hint">Tap the play button to start capturing wish URLs</string>
+    <string name="capturing_hint">Please open wish history in your game</string>
+    <string name="url_captured">URL Captured!</string>
+    <string name="capture_another">Capture Another</string>
+    <string name="error">Error</string>
+    <string name="try_again">Try Again</string>
+</resources>
