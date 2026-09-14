@@ -10,6 +10,7 @@
     <string name="stop_capture">Stop Capture</string>
     <string name="capturing">Capturing...</string>
     <string name="copy_to_clipboard">Copy to Clipboard</string>
+    <string name="copied_to_clipboard">Copied to clipboard</string>
     <string name="about">About</string>
     <string name="about_title">Wish Export</string>
     <string name="about_description">This app captures wish/gacha history URLs from Genshin Impact, Honkai Star Rail, and Zenless Zone Zero by monitoring logcat.\n\nTo use:\n1. Select your access mode (Shizuku or Root)\n2. Open the game and navigate to wish/warp/signal history\n3. Tap the capture button\n4. The URL will be automatically detected and displayed\n5. Copy the URL to import your history</string>

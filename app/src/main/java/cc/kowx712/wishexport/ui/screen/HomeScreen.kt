@@ -1,5 +1,6 @@
 package cc.kowx712.wishexport.ui.screen
 
+import android.widget.Toast
 import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -43,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -66,6 +68,8 @@ fun HomeScreen(
     onPermissionDenied: () -> Unit,
     accessMode: AccessMode? = null
 ) {
+    val context = LocalContext.current
+    val copiedMessage = stringResource(R.string.copied_to_clipboard)
     var showAboutDialog by remember { mutableStateOf(false) }
     var showPermissionDialog by remember { mutableStateOf(false) }
     val activity = LocalActivity.current
@@ -151,7 +155,10 @@ fun HomeScreen(
                     is CaptureState.Success -> {
                         SuccessContent(
                             url = captureState.url,
-                            onCopy = onCopyToClipboard,
+                            onCopy = { url ->
+                                onCopyToClipboard(url)
+                                Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
+                            },
                             onReset = onReset
                         )
                     }
