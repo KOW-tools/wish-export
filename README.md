@@ -1,6 +1,12 @@
+<div align="center">
+
+<img src="wish-export.svg" alt="Wish Export" style="width: 256px;"/>
+
 # Wish Export
 
 Wish Export finds the wish or gacha history URL for supported HoYoverse games and lets you copy it for use with a gacha history tracker.
+
+</div>
 
 ## Supported games
 
