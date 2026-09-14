@@ -1,90 +1,80 @@
 package cc.kowx712.wishexport.service
 
-import android.os.ParcelFileDescriptor
 import android.util.Log
 import androidx.annotation.Keep
-import java.io.FileOutputStream
+import cc.kowx712.wishexport.model.GameConfig
+import java.io.BufferedReader
+import java.io.InputStreamReader
 
-/**
- * Shizuku user service implementation.
- * This runs with Shizuku's elevated permissions.
- */
+/** Runs logcat and URL matching under Shizuku's shell/root identity. */
 @Keep
 class ShizukuLogcatUserService : IShizukuLogcatService.Stub() {
-
     companion object { private const val TAG = "ShizukuLogcatUserService" }
 
     private var logcatProcess: Process? = null
-    private var logcatOutput: ParcelFileDescriptor? = null
-    private var executeFailureLogged = false
-
-    override fun executeLogcat(command: Array<String>): String {
-        return try {
-            val process = ProcessBuilder(*command)
-                .redirectErrorStream(true)
-                .start()
-            val output = process.inputStream.bufferedReader().use { it.readText() }
-            process.waitFor()
-            executeFailureLogged = false
-            output
-        } catch (e: Exception) {
-            if (!executeFailureLogged) {
-                Log.e(TAG, "executeLogcat failed", e)
-                executeFailureLogged = true
-            }
-            "Error: ${e.message}"
-        }
-    }
-
-    override fun clearLogcat() {
-        try {
-            val process = ProcessBuilder("/system/bin/logcat", "-c")
-                .redirectErrorStream(true)
-                .start()
-            if (process.waitFor() != 0) {
-                Log.w(TAG, "Failed to clear logcat")
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to clear logcat", e)
-        }
-    }
+    private var captureThread: Thread? = null
 
     @Synchronized
-    override fun startLogcat(command: Array<String>): ParcelFileDescriptor {
-        stopLogcat()
-        val pipe = ParcelFileDescriptor.createPipe()
-        val process = Runtime.getRuntime().exec(command)
+    override fun startCapture(callback: IShizukuLogcatCallback) {
+        stopCapture()
+        clearLogcat()
+        val process = try {
+            ProcessBuilder(
+                "/system/bin/logcat", "-b", "main", "-b", "system", "-v", "raw", "*:V"
+            ).redirectErrorStream(true).start()
+        } catch (e: Exception) {
+            callback.onCaptureError(e.message ?: "Failed to start logcat")
+            return
+        }
         logcatProcess = process
-        logcatOutput = pipe[1]
-
-        Thread {
+        captureThread = Thread {
             try {
-                process.inputStream.use { input ->
-                    FileOutputStream(pipe[1].fileDescriptor).use { output ->
-                        input.copyTo(output)
+                BufferedReader(InputStreamReader(process.inputStream), 32768).use { reader ->
+                    while (!Thread.currentThread().isInterrupted) {
+                        val line = reader.readLine() ?: break
+                        val url = GameConfig.SUPPORTED_CONFIGS.firstNotNullOfOrNull { config ->
+                            config.urlPattern.find(line)?.value
+                        }
+                        if (url != null) {
+                            if (isCurrent(process)) callback.onUrlFound(url)
+                            return@Thread
+                        }
                     }
                 }
-            } catch (_: Exception) {
-                // The pipe is closed when capture is stopped or the process exits.
+                if (isCurrent(process)) callback.onCaptureFinished()
+            } catch (e: Exception) {
+                if (isCurrent(process)) {
+                    Log.e(TAG, "Logcat capture failed", e)
+                    callback.onCaptureError(e.message ?: "Logcat capture failed")
+                }
             } finally {
-                try { process.destroy() } catch (_: Exception) { }
+                process.destroy()
                 synchronized(this) {
                     if (logcatProcess === process) {
                         logcatProcess = null
-                        logcatOutput = null
+                        captureThread = null
                     }
                 }
             }
-        }.apply { isDaemon = true }.start()
-
-        return pipe[0]
+        }.apply { name = "wish-logcat-capture"; isDaemon = true; start() }
     }
 
     @Synchronized
-    override fun stopLogcat() {
-        try { logcatProcess?.destroy() } catch (_: Exception) { }
-        try { logcatOutput?.close() } catch (_: Exception) { }
+    override fun stopCapture() {
+        captureThread?.interrupt()
+        logcatProcess?.destroy()
         logcatProcess = null
-        logcatOutput = null
+        captureThread = null
     }
+
+    private fun clearLogcat() {
+        try {
+            ProcessBuilder("/system/bin/logcat", "-c").start().waitFor()
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to clear logcat", e)
+        }
+    }
+
+    @Synchronized
+    private fun isCurrent(process: Process): Boolean = logcatProcess === process
 }

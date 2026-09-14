@@ -10,29 +10,19 @@ package cc.kowx712.wishexport.model
  * No log tag filtering needed - the URL patterns are specific enough.
  */
 data class GameConfig(
-    val name: String,
+    val gameNames: List<String>,
     val urlPattern: Regex
 ) {
     companion object {
         private const val UNIVERSAL_LINK_REGEX = "https://\\S+\\.(?:mihoyo|hoyoverse)\\.com/\\S*authkey=\\S+"
 
-        val SUPPORTED_GAMES = listOf(
+        val SUPPORTED_CONFIGS = listOf(
             GameConfig(
-                name = "Genshin Impact",
-                urlPattern = Regex(
-                    UNIVERSAL_LINK_REGEX,
-                    RegexOption.IGNORE_CASE
-                )
-            ),
-            GameConfig(
-                name = "Honkai Star Rail",
-                urlPattern = Regex(
-                    UNIVERSAL_LINK_REGEX,
-                    RegexOption.IGNORE_CASE
-                )
-            ),
-            GameConfig(
-                name = "Zenless Zone Zero",
+                gameNames = listOf(
+                    "Genshin Impact",
+                    "Honkai: Star Rail",
+                    "Zenless Zone Zero"
+                ),
                 urlPattern = Regex(
                     UNIVERSAL_LINK_REGEX,
                     RegexOption.IGNORE_CASE

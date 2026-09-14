@@ -1,19 +1,21 @@
 package cc.kowx712.wishexport.service
 
 import android.content.ComponentName
-import android.os.ParcelFileDescriptor
 import android.util.Log
 import cc.kowx712.wishexport.model.AccessMode
 import cc.kowx712.wishexport.model.GameConfig
 import com.topjohnwu.superuser.Shell
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.withContext
 import rikka.shizuku.Shizuku
 import java.io.BufferedReader
-import java.io.ByteArrayInputStream
-import java.io.InputStream
 import java.io.InputStreamReader
-import java.io.OutputStream
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlin.time.Duration.Companion.minutes
 
 private const val LOGCAT_CAPTURE_SERVICE = "LogcatCaptureService"
 private const val SHIZUKU_LOGCAT_TAG = "ShizukuLogcatService"
@@ -24,6 +26,9 @@ private const val ROOT_LOGCAT_TAG = "RootLogcatService"
  * Implements the Template Method pattern for extensibility.
  */
 abstract class LogcatCaptureService {
+
+    @Volatile
+    private var activeProcess: Process? = null
 
     companion object {
         private const val TAG = LOGCAT_CAPTURE_SERVICE
@@ -38,13 +43,21 @@ abstract class LogcatCaptureService {
         try {
             clearLogcat()
             val process = startLogcatProcess()
+            activeProcess = process
             val url = readLogcatOutput(process)
-            process.destroy()
             url
         } catch (e: Exception) {
             Log.e(TAG, "Error capturing wish URL", e)
             null
+        } finally {
+            activeProcess?.destroy()
+            activeProcess = null
         }
+    }
+
+    open fun stopCapture() {
+        activeProcess?.destroy()
+        activeProcess = null
     }
 
     /**
@@ -101,8 +114,8 @@ abstract class LogcatCaptureService {
      * Extracts wish URL from a logcat line if it matches any game pattern.
      */
     protected fun extractWishUrl(line: String): String? {
-        for (game in GameConfig.SUPPORTED_GAMES) {
-            val matchResult = game.urlPattern.find(line)
+        for (config in GameConfig.SUPPORTED_CONFIGS) {
+            val matchResult = config.urlPattern.find(line)
             if (matchResult != null) {
                 return matchResult.value
             }
@@ -127,7 +140,7 @@ class ShizukuLogcatService : LogcatCaptureService() {
             "cc.kowx712.wishexport",
             ShizukuLogcatUserService::class.java.name
         )
-    ).daemon(false).processNameSuffix("logcat").debuggable(true).version(2)
+    ).daemon(false).processNameSuffix("logcat").debuggable(true).version(4)
 
     private fun bindService(): Boolean {
         return try {
@@ -151,97 +164,51 @@ class ShizukuLogcatService : LogcatCaptureService() {
         }
     }
 
-    override suspend fun clearLogcat() {
-        withContext(Dispatchers.IO) {
-            try {
-                if (bindService()) {
-                    serviceConnection.getBinder()?.clearLogcat()
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to clear logcat", e)
-            }
-        }
-    }
+    override suspend fun clearLogcat() = Unit
 
     override suspend fun captureWishUrl(): String? = withContext(Dispatchers.IO) {
-        val deadline = System.currentTimeMillis() + 600000L
-        var binder = serviceConnection.getBinder()
-        var readFailureLogged = false
-        while (System.currentTimeMillis() < deadline) {
-            try {
-                if (binder == null || !serviceConnection.isConnected()) {
-                    bindService()
-                    binder = serviceConnection.getBinder()
-                    if (binder == null) {
-                        Thread.sleep(500)
-                        continue
-                    }
-                }
-                // Keep the Binder response small; large log dumps can exceed the
-                val output = binder.executeLogcat(arrayOf("/system/bin/logcat", "-d", "-v", "raw", "-t", "40", "*:*"))
-                readFailureLogged = false
-                output.lineSequence().forEach { line ->
-                    if (!line.contains("cc.kowx712.wishexport")) {
-                        extractWishUrl(line)?.let { return@withContext it }
-                    }
-                }
-            } catch (e: Exception) {
-                if (!readFailureLogged) {
-                    Log.e(TAG, "Failed to read logcat", e)
-                    readFailureLogged = true
-                }
-                binder = null
-                Thread.sleep(500)
-            }
-            Thread.sleep(500)
-        }
-        null
-    }
-
-    override fun startLogcatProcess(): Process {
-        if (!bindService()) {
-            throw IllegalStateException("Unable to connect to Shizuku user service")
-        }
+        if (!bindService()) throw IllegalStateException("Unable to connect to Shizuku user service")
         val binder = serviceConnection.getBinder()
             ?: throw IllegalStateException("Shizuku logcat service is unavailable")
-        val descriptor = binder.startLogcat(arrayOf("logcat", "-v", "raw", "*:*"))
-        return ShizukuLogcatProcess(descriptor, binder)
-    }
-}
-
-private class ShizukuLogcatProcess(
-    descriptor: ParcelFileDescriptor,
-    private val service: IShizukuLogcatService
-) : Process() {
-    private val input = ParcelFileDescriptor.AutoCloseInputStream(descriptor)
-    private val error = ByteArrayInputStream(ByteArray(0))
-    @Volatile private var exited = false
-
-    override fun getInputStream(): InputStream = input
-    override fun getErrorStream(): InputStream = error
-    override fun getOutputStream(): OutputStream = NULL_OUTPUT_STREAM
-    override fun waitFor(): Int {
-        try { input.readBytes() } catch (_: Exception) { }
-        exited = true
-        return 0
-    }
-    override fun exitValue(): Int {
-        if (!exited) throw IllegalThreadStateException("Process has not exited")
-        return 0
-    }
-    override fun destroy() {
-        if (exited) return
-        exited = true
-        try { service.stopLogcat() } catch (_: Exception) { }
-        try { input.close() } catch (_: Exception) { }
-    }
-    override fun isAlive(): Boolean = !exited
-
-    private companion object {
-        val NULL_OUTPUT_STREAM: OutputStream = object : OutputStream() {
-            override fun write(byte: Int) = Unit
+        try {
+            withTimeoutOrNull(10.minutes) {
+                suspendCancellableCoroutine { continuation ->
+                    val completed = AtomicBoolean(false)
+                    val callback = object : IShizukuLogcatCallback.Stub() {
+                        override fun onUrlFound(url: String) {
+                            if (completed.compareAndSet(false, true)) continuation.resume(url)
+                        }
+                        override fun onCaptureError(message: String) {
+                            if (completed.compareAndSet(false, true)) {
+                                continuation.resumeWithException(IllegalStateException(message))
+                            }
+                        }
+                        override fun onCaptureFinished() {
+                            if (completed.compareAndSet(false, true)) continuation.resume(null)
+                        }
+                    }
+                    continuation.invokeOnCancellation {
+                        completed.set(true)
+                        try { binder.stopCapture() } catch (_: Exception) { }
+                    }
+                    try {
+                        binder.startCapture(callback)
+                    } catch (e: Exception) {
+                        if (completed.compareAndSet(false, true)) continuation.resumeWithException(e)
+                    }
+                }
+            }
+        } finally {
+            try { binder.stopCapture() } catch (_: Exception) { }
         }
     }
+
+    override fun stopCapture() {
+        try { serviceConnection.getBinder()?.stopCapture() } catch (_: Exception) { }
+    }
+
+    override fun startLogcatProcess(): Process =
+        throw UnsupportedOperationException("Shizuku capture runs in UserService")
 }
 
 /**

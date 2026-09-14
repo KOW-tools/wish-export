@@ -10,8 +10,11 @@ import androidx.lifecycle.viewModelScope
 import cc.kowx712.wishexport.data.PreferencesManager
 import cc.kowx712.wishexport.model.AccessMode
 import cc.kowx712.wishexport.model.CaptureState
+import cc.kowx712.wishexport.service.LogcatCaptureService
 import cc.kowx712.wishexport.service.LogcatServiceFactory
 import com.topjohnwu.superuser.Shell
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,6 +32,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private val preferencesManager = PreferencesManager(application)
+    private var captureJob: Job? = null
+    private var activeCaptureService: LogcatCaptureService? = null
 
     private val _captureState = MutableStateFlow<CaptureState>(CaptureState.Idle)
     val captureState: StateFlow<CaptureState> = _captureState.asStateFlow()
@@ -73,6 +78,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * Starts capturing wish URLs from logcat.
      */
     fun startCapture() {
+        if (captureJob?.isActive == true) return
+
         val mode = _accessMode.value
         if (mode == null) {
             _captureState.value = CaptureState.Error("Access mode not set")
@@ -88,10 +95,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
 
-        viewModelScope.launch {
+        captureJob = viewModelScope.launch {
+            val service = LogcatServiceFactory.create(mode)
+            activeCaptureService = service
             try {
                 _captureState.value = CaptureState.Capturing
-                val service = LogcatServiceFactory.create(mode)
                 val url = service.captureWishUrl()
 
                 if (url != null) {
@@ -101,9 +109,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         "No wish URL detected. Please open the wish history in your game and try again."
                     )
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _captureState.value = CaptureState.Error("An error occurred: ${e.message}")
                 Log.e(TAG, "Capture error", e)
+            } finally {
+                service.stopCapture()
+                if (activeCaptureService === service) {
+                    activeCaptureService = null
+                }
             }
         }
     }
@@ -113,6 +128,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun stopCapture() {
         if (_captureState.value is CaptureState.Capturing) {
+            captureJob?.cancel()
+            captureJob = null
+            activeCaptureService?.stopCapture()
+            activeCaptureService = null
             _captureState.value = CaptureState.Idle
         }
     }
@@ -156,9 +175,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun checkRootAvailability(): Boolean {
         return try {
-            Shell.getShell().isRoot()
+            Shell.getShell().isRoot
         } catch (_: Exception) {
             false
         }
+    }
+
+    override fun onCleared() {
+        captureJob?.cancel()
+        activeCaptureService?.stopCapture()
     }
 }
