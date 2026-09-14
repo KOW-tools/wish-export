@@ -131,9 +131,6 @@ dependencies {
     // MaterialKolor for dynamic theming
     implementation(libs.materialkolor)
 
-    // DataStore for persistent preferences
-    implementation(libs.androidx.datastore.preferences)
-
     // Core
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

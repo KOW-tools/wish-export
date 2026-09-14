@@ -10,7 +10,6 @@ coroutines = "1.11.0"
 shizuku = "13.1.5"
 materialkolor = "5.0.1"
 libsu = "6.0.0"
-datastore = "1.2.1"
 
 [libraries]
 # AndroidX Core
@@ -46,9 +45,6 @@ libsu-io = { group = "com.github.topjohnwu.libsu", name = "io", version.ref = "l
 
 # MaterialKolor
 materialkolor = { group = "com.materialkolor", name = "material-kolor", version.ref = "materialkolor" }
-
-# DataStore
-androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
