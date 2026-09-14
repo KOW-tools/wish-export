@@ -7,8 +7,8 @@ plugins {
 }
 
 val appName = "Wish Export"
-val appVersionName = "1.0.0"
-val appVersionCode = 1
+val appVersionCode = rootProject.extra["appVersionCode"] as Int
+val appVersionName = rootProject.extra["appVersionName"] as String
 
 android {
     namespace = "cc.kowx712.wishexport"
