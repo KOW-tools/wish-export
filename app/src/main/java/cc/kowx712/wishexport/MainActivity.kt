@@ -26,7 +26,9 @@ import rikka.shizuku.Shizuku
  */
 class MainActivity : ComponentActivity() {
 
-    companion object { private const val SHIZUKU_REQUEST_CODE = 1 }
+    companion object {
+        private const val SHIZUKU_REQUEST_CODE = 1
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

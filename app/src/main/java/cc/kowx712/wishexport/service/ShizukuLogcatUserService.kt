@@ -9,7 +9,9 @@ import java.io.InputStreamReader
 /** Runs logcat and URL matching under Shizuku's shell/root identity. */
 @Keep
 class ShizukuLogcatUserService : IShizukuLogcatService.Stub() {
-    companion object { private const val TAG = "ShizukuLogcatUserService" }
+    companion object {
+        private const val TAG = "ShizukuLogcatUserService"
+    }
 
     private var logcatProcess: Process? = null
     private var captureThread: Thread? = null

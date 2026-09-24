@@ -7,8 +7,8 @@ import cc.kowx712.wishexport.model.GameConfig
 import com.topjohnwu.superuser.Shell
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import rikka.shizuku.Shizuku
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -92,7 +92,8 @@ abstract class LogcatCaptureService {
                 if (line.contains("cc.kowx712.wishexport") ||
                     line.contains(LOGCAT_CAPTURE_SERVICE) ||
                     line.contains(ROOT_LOGCAT_TAG) ||
-                    line.contains(SHIZUKU_LOGCAT_TAG)) {
+                    line.contains(SHIZUKU_LOGCAT_TAG)
+                ) {
                     continue
                 }
 
@@ -178,18 +179,23 @@ class ShizukuLogcatService : LogcatCaptureService() {
                         override fun onUrlFound(url: String) {
                             if (completed.compareAndSet(false, true)) continuation.resume(url)
                         }
+
                         override fun onCaptureError(message: String) {
                             if (completed.compareAndSet(false, true)) {
                                 continuation.resumeWithException(IllegalStateException(message))
                             }
                         }
+
                         override fun onCaptureFinished() {
                             if (completed.compareAndSet(false, true)) continuation.resume(null)
                         }
                     }
                     continuation.invokeOnCancellation {
                         completed.set(true)
-                        try { binder.stopCapture() } catch (_: Exception) { }
+                        try {
+                            binder.stopCapture()
+                        } catch (_: Exception) {
+                        }
                     }
                     try {
                         binder.startCapture(callback)
@@ -199,12 +205,18 @@ class ShizukuLogcatService : LogcatCaptureService() {
                 }
             }
         } finally {
-            try { binder.stopCapture() } catch (_: Exception) { }
+            try {
+                binder.stopCapture()
+            } catch (_: Exception) {
+            }
         }
     }
 
     override fun stopCapture() {
-        try { serviceConnection.getBinder()?.stopCapture() } catch (_: Exception) { }
+        try {
+            serviceConnection.getBinder()?.stopCapture()
+        } catch (_: Exception) {
+        }
     }
 
     override fun startLogcatProcess(): Process =

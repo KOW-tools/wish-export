@@ -142,9 +142,11 @@ fun HomeScreen(
                     is CaptureState.Idle -> {
                         IdleContent()
                     }
+
                     is CaptureState.Capturing -> {
                         CapturingContent()
                     }
+
                     is CaptureState.Success -> {
                         SuccessContent(
                             url = captureState.url,
@@ -155,6 +157,7 @@ fun HomeScreen(
                             onReset = onReset
                         )
                     }
+
                     is CaptureState.Error -> {
                         ErrorContent(
                             message = captureState.message,
@@ -181,7 +184,8 @@ fun HomeScreen(
     // Check for permission errors
     if (captureState is CaptureState.Error &&
         (captureState.message.contains("not running", ignoreCase = true) ||
-         captureState.message.contains("not available", ignoreCase = true))) {
+                captureState.message.contains("not available", ignoreCase = true))
+    ) {
         showPermissionDialog = true
     }
 }
